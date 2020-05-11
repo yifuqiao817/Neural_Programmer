@@ -8,10 +8,10 @@ from nltk.corpus import stopwords
 import string
 import random as rd
 import pickle
-col_num = 5
-huber = 10
-lamb = 25
-alpha = 0.01
+col_num = 5 #Decide the size of data
+huber = 10 #Parameter of loss function
+lamb = 25 #Parameter of loss function
+alpha = 0.01 #Decide the learning rate
 op_words = ['sum','count','max','min','product','print']
 cp_words = ['greater','lesser']
 lg_words = ['and','or','nand','nor']
@@ -23,7 +23,7 @@ col_ind = ['A','B','C','D','E','F','G','H','I','J']
 col_ind = col_ind[:col_num]
 all_words = [op_words,cp_words,lg_words,ar_words,sc_words,ew_words,rs_words,col_ind]
 
-def vectorize(words):
+def vectorize(words): #Initialize the word embedding 
     dict = {}
     allw = []
     allop = []
@@ -44,10 +44,10 @@ def vectorize(words):
 word_dict, ops, cols = vectorize(all_words)
 op_ori = np.array(ops)
 col_ori = np.array(cols)
-op_mat = Variable(torch.from_numpy(np.array(ops)),requires_grad=True)
-col_mat = Variable(torch.from_numpy(np.array(cols)),requires_grad=True)
+op_mat = Variable(torch.from_numpy(np.array(ops)),requires_grad=True) #Operation Matrix to be learned
+col_mat = Variable(torch.from_numpy(np.array(cols)),requires_grad=True) #Column Matrix to be learned
 
-def question_generate_threecol(dataset):
+def question_generate_threecol(dataset): #Generate questions of selecting three columns
     row_num, col_num = dataset.shape
     qaset = []
     col_set = []
@@ -119,7 +119,7 @@ def question_generate_threecol(dataset):
                             print(qone)
     return qaset
 
-def question_generate_twocol(dataset):
+def question_generate_twocol(dataset): #Generating questions of selecting two columns
     row_num, col_num = dataset.shape
     qaset = []
     col_set = []
@@ -171,7 +171,7 @@ def question_generate_twocol(dataset):
                             print(qone, aone)
     return qaset
 
-def question_generate_onecol(dataset):
+def question_generate_onecol(dataset): #Generating questions of selecting one column
     row_num, col_num = dataset.shape
     qaset = []
     col_set = []
@@ -221,7 +221,7 @@ def question_generate_onecol(dataset):
                         print(qone)
     return qaset
 
-def question_generate_arith(dataset):
+def question_generate_arith(dataset): #Generating questions without any other immediate numbers
     row_num, col_num = dataset.shape
     qaset = []
     col_set = []
@@ -264,7 +264,7 @@ def question_generate_arith(dataset):
                             print(qone)
     return qaset
 
-def question_change(q):
+def question_change(q): #Change question words into embeddings, pick numbers out. 
     op_matnp = op_mat.data.numpy()
     col_matnp = col_mat.data.numpy()
     vws = []
@@ -284,11 +284,11 @@ def question_change(q):
             num.append((vws[-1],oneword))
     return vws, num
 
-def generate_data(M,C):
+def generate_data(M,C): #Get the data columns
     table = 20 * np.random.random_sample((M,C)) - 10
     return table
 
-def question_rnn_forward(qs,wq):
+def question_rnn_forward(qs,wq): #Question RNN module
     #qs:list of (d,1)
     #wq:(d,2d)
     d = qs[0].shape[0]
@@ -304,13 +304,13 @@ def question_rnn_forward(qs,wq):
     q = zs[-1]
     return q, zs
 
-def softmax(inp):
+def softmax(inp): #Softmax module
     inp_ex = np.exp(inp)
     inp_sum = np.sum(inp)
     sftm = inp_ex / inp_sum
     return sftm
 
-def selector_op_forward(wop,qr,ht):
+def selector_op_forward(wop,qr,ht): #Operation selector module
     #qr:(d,1)
     #wop:(d,2d)
     #ht:(d,1), from history RNN
@@ -319,7 +319,7 @@ def selector_op_forward(wop,qr,ht):
     #(15,1)
     return alpha_op
 
-def selector_data_forward(wcol,qr,ht):
+def selector_data_forward(wcol,qr,ht): #Data selector module
     #colmat:(C,d)
     #wcol:(d,2d)
     inp_now = np.concatenate((qr, ht), axis=0)
@@ -327,7 +327,7 @@ def selector_data_forward(wcol,qr,ht):
     #(C,1)
     return alpha_col
 
-def operation_forward(dataset,sans,lans,rslc,zs,aop,acol):
+def operation_forward(dataset,sans,lans,rslc,zs,aop,acol): #Operation Processing module
     #sans[t-2]:const
     #lans[t-2]:(M,C)
     #rslc[t-2]:(M,1)
@@ -421,7 +421,7 @@ def operation_forward(dataset,sans,lans,rslc,zs,aop,acol):
     rslc.append(row_select)
     return sans, lans, rslc
 
-def history_RNN_forward(aop,acol,whis,htp,t,d):
+def history_RNN_forward(aop,acol,whis,htp,t,d): #History RNN module
     #aop:(15,1)
     #acol:(C,1)
     #op_mat:(15,d)
@@ -438,7 +438,7 @@ def history_RNN_forward(aop,acol,whis,htp,t,d):
     return ht
 
 #what need to be trained: wq, whis, op_mat, col_mat, wcol, wop
-def loss_scalar(sans,y):
+def loss_scalar(sans,y): #Loss function of scalar output
     a = abs(sans - y)
     if(a <= huber):
         loss = 0.5 * a * a
@@ -446,7 +446,7 @@ def loss_scalar(sans,y):
         loss = huber * a - 0.5 * huber * huber
     return loss
 
-def loss_lookup(lans,y):
+def loss_lookup(lans,y): #Loss function of lookup output
     L = 0
     for m in range(lans.shape[0]):
         for c in range(lans.shape[1]):
@@ -457,12 +457,13 @@ def loss_lookup(lans,y):
 
 data = generate_data(120,col_num)
 d = len(cols[0])
-W_col = Variable(torch.randn(d,2*d),requires_grad=True)
-W_op = Variable(torch.randn(d,2*d),requires_grad=True)
-W_Q = Variable(torch.randn(d,2*d),requires_grad=True)
-W_H = Variable(torch.randn(d,3*d),requires_grad=True)
+W_col = Variable(torch.randn(d,2*d),requires_grad=True) #Initialize the weight matrix in data selector
+W_op = Variable(torch.randn(d,2*d),requires_grad=True) #                              in operation selector 
+W_Q = Variable(torch.randn(d,2*d),requires_grad=True) #                               in question RNN
+W_H = Variable(torch.randn(d,3*d),requires_grad=True) #                               in history RNN
 
-'''''''''''''''''''''''''''''''''''''''''
+
+#generate the questions
 q_3col = question_generate_threecol(data)
 #q_2col = question_generate_twocol(data)
 q_1col = question_generate_onecol(data)
@@ -475,27 +476,28 @@ all_q.extend(q_arit)
 #allq = list(((set(q_3col)|set(q_2col))|set(q_1col))|set(q_arit))
 rd.shuffle(all_q)
 all_size = len(all_q)
-test_data = all_q[:int(all_size/10)]
+test_data = all_q[:int(all_size/10)] #Split train data and test data
 train_data = all_q[int(all_size/10):]
 data_dict = {'train':train_data,'test':test_data}
 with open('D:/Yifu/NP_data.pkl','wb')as f:
     pickle.dump(data_dict,f,pickle.HIGHEST_PROTOCOL)
-'''''''''''''''''''''''''''''''''''''''''
+
+#Load the existing data
+#with open('D:/Yifu/NP_data.pkl','rb')as f:
+#    data_dict = pickle.load(f)
+#train_data = data_dict['train']
+#test_data = data_dict['test']
 
 
-with open('D:/Yifu/NP_data.pkl','rb')as f:
-    data_dict = pickle.load(f)
-train_data = data_dict['train']
-test_data = data_dict['test']
 
-step = 500
-batch_size = 256
-losses = []
+step = 500 #Value of training steps
+batch_size = 256 #Size of input in one epoch
+losses = [] #Store the loss
 for epoch in range(step):
     startnum = rd.randint(0,len(train_data) - batch_size)
-    train_batch = train_data[startnum:startnum + batch_size]
+    train_batch = train_data[startnum:startnum + batch_size] #Get one batch randomly
     L = torch.zeros(1)
-    for (question,answer,type) in train_batch:
+    for (question,answer,type) in train_batch: #'type' is to know whether the output is scalar or lookup vector
         #print('1',end='')
         qrnn_input, piv_input = question_change(question)
         scalar_answers = [0]
@@ -505,21 +507,19 @@ for epoch in range(step):
         ht = np.zeros((d,1))
         aop = np.zeros((16,1))
         acol = np.zeros((col_num,1))
-        for time in range(4):
+        for time in range(4): #Four time steps
             ht = history_RNN_forward(aop,acol,W_H,ht,time,d)
             aop = selector_op_forward(W_op,q_rep,ht)
             acol = selector_data_forward(W_col,q_rep,ht)
             scalar_answers,lookup_answers,row_selects = operation_forward(data,scalar_answers,lookup_answers,row_selects,piv_input,aop,acol)
-        if(type == 1):
+        if(type == 1): #Scalar Output
             result = scalar_answers[-1]
             L += torch.tensor(loss_scalar(result,answer)/batch_size,requires_grad=True)
-        if(type == 0):
+        if(type == 0): #Lookup Output
             result = lookup_answers[-1]
             L += torch.tensor(loss_lookup(result,answer) * lamb/batch_size,requires_grad=True)
-        print(type,L)
-    print(L)
-    L.backward()
-    W_col.data -= W_col.grad.data * alpha
+    L.backward() #BP
+    W_col.data -= W_col.grad.data * alpha #Update the variables
     W_op.data -= W_op.grad.data * alpha
     W_H.data -= W_H.grad.data * alpha
     W_Q.data -= W_Q.grad.data * alpha
